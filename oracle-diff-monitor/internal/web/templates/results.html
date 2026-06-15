@@ -1,0 +1,76 @@
+{{define "content"}}
+<div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">比对结果</h1>
+    <p class="mt-1 text-sm text-gray-500">查看比对执行记录、进度和差异详情</p>
+</div>
+<form class="mb-4 flex space-x-3 items-center" method="get" action="/runs">
+    <label class="text-sm text-gray-700">按任务筛选</label>
+    <select name="pair_id" onchange="this.form.submit()" class="border border-gray-300 rounded-md shadow-sm py-1.5 px-3 text-sm">
+        <option value="">全部</option>
+        {{range .pairs}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+    </select>
+</form>
+<div class="bg-white rounded-lg shadow overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">任务</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">状态</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">执行进度</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">扫描表</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">差异表</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">开始时间</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">耗时</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
+            </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+            {{range .runs}}
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 text-sm text-gray-900">#{{.ID}}</td>
+                <td class="px-6 py-4 text-sm text-gray-500">{{.PairName}}</td>
+                <td class="px-6 py-4">
+                    {{if eq .Status "success"}}
+                    <span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">成功</span>
+                    {{else if eq .Status "running"}}
+                    <span data-running="true" class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">运行中</span>
+                    {{else}}
+                    <span class="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">失败</span>
+                    {{end}}
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-500">
+                    {{if eq .Status "running"}}
+                    <div class="font-medium text-gray-700">{{if .ProgressMsg}}{{.ProgressMsg}}{{else}}正在执行{{end}}</div>
+                    <div class="mt-1 text-xs text-gray-500">
+                        {{if gt .TotalTables 0}}{{.ProcessedTables}} / {{.TotalTables}}{{else}}准备中{{end}}{{if .CurrentTable}} · {{.CurrentTable}}{{end}}
+                    </div>
+                    {{else if eq .Status "failed"}}
+                    <div class="font-medium text-red-700">{{if .ProgressMsg}}{{.ProgressMsg}}{{else}}执行失败{{end}}</div>
+                    {{if .ErrorMsg}}<div class="mt-1 text-xs text-red-600 break-all">{{.ErrorMsg}}</div>{{end}}
+                    {{else}}
+                    <div class="font-medium text-green-700">{{if .ProgressMsg}}{{.ProgressMsg}}{{else}}比对完成{{end}}</div>
+                    {{end}}
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-500">{{.TotalTables}}</td>
+                <td class="px-6 py-4 text-sm {{if gt .DiffTables 0}}text-red-600 font-medium{{else}}text-gray-500{{end}}">{{.DiffTables}}</td>
+                <td class="px-6 py-4 text-sm text-gray-500">{{.StartedAt.Format "2006-01-02 15:04:05"}}</td>
+                <td class="px-6 py-4 text-sm text-gray-500">{{Duration .CompareRun}}</td>
+                <td class="px-6 py-4 text-sm">
+                    <a href="/runs/{{.ID}}" class="text-blue-600 hover:underline">详情</a>
+                    <a href="/runs/{{.ID}}/export" class="ml-2 text-gray-600 hover:underline">导出</a>
+                </td>
+            </tr>
+            {{else}}
+            <tr><td colspan="9" class="px-6 py-8 text-center text-gray-500">暂无记录</td></tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+<script>
+if (document.querySelector('[data-running="true"]')) {
+    setTimeout(function(){ window.location.reload(); }, 5000);
+}
+</script>
+{{end}}
+{{template "layout.html" .}}

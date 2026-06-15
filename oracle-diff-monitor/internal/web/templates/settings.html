@@ -1,0 +1,60 @@
+{{define "content"}}
+<div class="mb-6"><h1 class="text-2xl font-bold text-gray-900">系统设置</h1><p class="mt-1 text-sm text-gray-500">管理通知渠道和定时调度任务</p></div>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="bg-white rounded-lg shadow">
+        <div class="px-6 py-4 border-b border-gray-200"><h2 class="text-lg font-medium text-gray-900">通知渠道</h2></div>
+        <div class="p-6">
+            {{range .notifications}}
+            <div class="flex items-center justify-between py-3 border-b border-gray-100">
+                <div><span class="font-medium text-gray-900">{{.Name}}</span> <span class="ml-2 px-2 py-0.5 text-xs rounded-full {{if eq .Type "email"}}bg-blue-100 text-blue-700{{else}}bg-purple-100 text-purple-700{{end}}">{{if eq .Type "email"}}邮件{{else}}Webhook{{end}}</span> {{if not .Enabled}}<span class="text-xs text-gray-400">(禁用)</span>{{end}}</div>
+                <div class="space-x-2">
+                    <a href="/settings/notifications/{{.ID}}/edit" class="text-blue-600 hover:text-blue-800 text-sm">编辑</a>
+                    <form action="/settings/notifications/{{.ID}}/delete" method="POST" class="inline" onsubmit="return confirm('确定删除?')"><button type="submit" class="text-red-600 hover:text-red-800 text-sm">删除</button></form>
+                </div>
+            </div>
+            {{else}}<p class="text-sm text-gray-500 py-4 text-center">暂无通知渠道</p>{{end}}
+            <details class="mt-4">
+                <summary class="text-sm text-blue-600 cursor-pointer hover:text-blue-800">添加通知渠道</summary>
+                <form action="/settings/notifications" method="POST" class="mt-3 space-y-3">
+                    <div><label class="block text-xs font-medium text-gray-700">名称</label><input type="text" name="name" required class="mt-1 block w-full border border-gray-300 rounded-md py-1.5 px-3 text-sm"></div>
+                    <div><label class="block text-xs font-medium text-gray-700">类型</label><select name="type" class="mt-1 block w-full border border-gray-300 rounded-md py-1.5 px-3 text-sm" onchange="document.getElementById('email-cfg').className=this.value==='email'?'':'hidden';document.getElementById('wh-cfg').className=this.value==='webhook'?'':'hidden'"><option value="email">邮件</option><option value="webhook">Webhook</option></select></div>
+                    <div id="email-cfg">
+                        <div class="grid grid-cols-2 gap-2"><div><label class="block text-xs font-medium text-gray-700">SMTP主机</label><input type="text" name="smtp_host" class="mt-1 block w-full border border-gray-300 rounded-md py-1.5 px-3 text-sm"></div><div><label class="block text-xs font-medium text-gray-700">端口</label><input type="number" name="smtp_port" value="465" class="mt-1 block w-full border border-gray-300 rounded-md py-1.5 px-3 text-sm"></div></div>
+                        <div class="grid grid-cols-2 gap-2 mt-2"><div><label class="block text-xs font-medium text-gray-700">用户名</label><input type="text" name="smtp_user" class="mt-1 block w-full border border-gray-300 rounded-md py-1.5 px-3 text-sm"></div><div><label class="block text-xs font-medium text-gray-700">密码</label><input type="password" name="smtp_pass" class="mt-1 block w-full border border-gray-300 rounded-md py-1.5 px-3 text-sm"></div></div>
+                        <div class="mt-2"><label class="block text-xs font-medium text-gray-700">发件人地址</label><input type="email" name="from_addr" class="mt-1 block w-full border border-gray-300 rounded-md py-1.5 px-3 text-sm"></div>
+                        <div class="mt-2"><label class="block text-xs font-medium text-gray-700">收件人(逗号分隔)</label><input type="text" name="to_addresses" placeholder="a@x.com,b@x.com" class="mt-1 block w-full border border-gray-300 rounded-md py-1.5 px-3 text-sm"></div>
+                        <div class="mt-2"><input type="checkbox" name="use_tls" class="h-4 w-4 text-blue-600 border-gray-300 rounded"> <label class="text-xs text-gray-700">TLS</label></div>
+                    </div>
+                    <div id="wh-cfg" class="hidden"><label class="block text-xs font-medium text-gray-700">Webhook URL</label><input type="url" name="webhook_url" class="mt-1 block w-full border border-gray-300 rounded-md py-1.5 px-3 text-sm" placeholder="https://hooks.example.com/alert"><label class="block text-xs font-medium text-gray-700 mt-2">自定义Headers (每行 Key: Value)</label><textarea name="webhook_headers" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md py-1.5 px-3 text-sm" placeholder="Authorization: Bearer token123&#10;X-Custom: value"></textarea></div>
+                    <div><input type="checkbox" name="enabled" checked class="h-4 w-4 text-blue-600 border-gray-300 rounded"> <label class="text-xs text-gray-700">启用</label></div>
+                    <button type="submit" class="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700">保存</button>
+                </form>
+            </details>
+        </div>
+    </div>
+    <div class="bg-white rounded-lg shadow">
+        <div class="px-6 py-4 border-b border-gray-200"><h2 class="text-lg font-medium text-gray-900">定时调度</h2></div>
+        <div class="p-6">
+            {{range .schedules}}
+            <div class="flex items-center justify-between py-3 border-b border-gray-100">
+                <div><span class="font-medium text-gray-900">{{.PairName}}</span> <span class="ml-2 text-sm text-gray-500 font-mono">{{.CronExpr}}</span> {{if not .Enabled}}<span class="text-xs text-gray-400">(暂停)</span>{{end}}</div>
+                <div class="space-x-2">
+                    <a href="/settings/schedules/{{.ID}}/edit" class="text-blue-600 hover:text-blue-800 text-sm">编辑</a>
+                    <form action="/settings/schedules/{{.ID}}/delete" method="POST" class="inline" onsubmit="return confirm('确定删除?')"><button type="submit" class="text-red-600 hover:text-red-800 text-sm">删除</button></form>
+                </div>
+            </div>
+            {{else}}<p class="text-sm text-gray-500 py-4 text-center">暂无定时任务</p>{{end}}
+            <details class="mt-4">
+                <summary class="text-sm text-blue-600 cursor-pointer hover:text-blue-800">添加定时任务</summary>
+                <form action="/settings/schedules" method="POST" class="mt-3 space-y-3">
+                    <div><label class="block text-xs font-medium text-gray-700">比对任务</label><select name="pair_id" required class="mt-1 block w-full border border-gray-300 rounded-md py-1.5 px-3 text-sm"><option value="">选择任务</option>{{range .pairs}}<option value="{{.ID}}">{{.Name}}</option>{{end}}</select></div>
+                    <div><label class="block text-xs font-medium text-gray-700">Cron表达式 (秒分时日月星期)</label><input type="text" name="cron_expr" value="0 0 0 * * *" required class="mt-1 block w-full border border-gray-300 rounded-md py-1.5 px-3 text-sm font-mono"><p class="mt-1 text-xs text-gray-500">如 <code class="bg-gray-100 px-1">0 0 0 * * *</code> 每小时整点, <code class="bg-gray-100 px-1">0 0 0 */6 * *</code> 每6小时, <code class="bg-gray-100 px-1">0 0 9 * * 1-5</code> 工作日9点</p></div>
+                    <div><input type="checkbox" name="enabled" checked class="h-4 w-4 text-blue-600 border-gray-300 rounded"> <label class="text-xs text-gray-700">启用</label></div>
+                    <button type="submit" class="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700">保存</button>
+                </form>
+            </details>
+        </div>
+    </div>
+</div>
+{{end}}
+{{template "layout.html" .}}

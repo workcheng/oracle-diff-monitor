@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{if .title}}{{.title}} - {{end}}Oracle 结构比对监控</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <nav class="bg-white border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex">
+                    <div class="flex-shrink-0 flex items-center">
+                        <span class="text-xl font-bold text-blue-600">Oracle Diff</span>
+                    </div>
+                    <div class="hidden sm:ml-8 sm:flex sm:space-x-4">
+                        <a href="/" class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md {{if eq .title "仪表盘"}}bg-blue-50 text-blue-700{{else}}text-gray-500 hover:text-gray-700{{end}}">仪表盘</a>
+                        <a href="/databases" class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md {{if eq .title "数据库管理"}}bg-blue-50 text-blue-700{{else}}text-gray-500 hover:text-gray-700{{end}}">数据库</a>
+                        <a href="/pairs" class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md {{if eq .title "比对任务"}}bg-blue-50 text-blue-700{{else}}text-gray-500 hover:text-gray-700{{end}}">比对任务</a>
+                        <a href="/runs" class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md {{if eq .title "比对结果"}}bg-blue-50 text-blue-700{{else}}text-gray-500 hover:text-gray-700{{end}}">比对结果</a>
+                        <a href="/settings" class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md {{if eq .title "系统设置"}}bg-blue-50 text-blue-700{{else}}text-gray-500 hover:text-gray-700{{end}}">设置</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+    <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        {{if .error}}
+        <div class="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
+            <p class="text-sm text-red-700">{{.error}}</p>
+        </div>
+        {{end}}
+        {{template "content" .}}
+    </main>
+</body>
+</html>

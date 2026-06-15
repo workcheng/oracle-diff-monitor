@@ -1,0 +1,67 @@
+{{define "content"}}
+<div class="mb-6"><h1 class="text-2xl font-bold text-gray-900">{{.title}}</h1></div>
+<div class="bg-white rounded-lg shadow p-6 max-w-2xl">
+    <form action="/settings/notifications/{{.notification.ID}}" method="POST" class="space-y-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700">名称</label>
+            <input type="text" name="name" value="{{.notification.Name}}" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700">类型</label>
+            <select name="type" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" onchange="document.getElementById('email-cfg').className=this.value==='email'?'':'hidden';document.getElementById('wh-cfg').className=this.value==='webhook'?'':'hidden'">
+                <option value="email" {{if eq .notification.Type "email"}}selected{{end}}>邮件</option>
+                <option value="webhook" {{if eq .notification.Type "webhook"}}selected{{end}}>Webhook</option>
+            </select>
+        </div>
+        <div id="email-cfg" {{if ne .notification.Type "email"}}class="hidden"{{end}}>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">SMTP主机</label>
+                    <input type="text" name="smtp_host" value="{{if .emailCfg}}{{.emailCfg.SMTPHost}}{{end}}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">端口</label>
+                    <input type="number" name="smtp_port" value="{{if .emailCfg}}{{.emailCfg.SMTPPort}}{{else}}465{{end}}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4 mt-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">用户名</label>
+                    <input type="text" name="smtp_user" value="{{if .emailCfg}}{{.emailCfg.Username}}{{end}}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">密码</label>
+                    <input type="password" name="smtp_pass" value="{{if .emailCfg}}{{.emailCfg.Password}}{{end}}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                </div>
+            </div>
+            <div class="mt-4">
+                <label class="block text-sm font-medium text-gray-700">发件人地址</label>
+                <input type="email" name="from_addr" value="{{if .emailCfg}}{{.emailCfg.FromAddr}}{{end}}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+            </div>
+            <div class="mt-4">
+                <label class="block text-sm font-medium text-gray-700">收件人(逗号分隔)</label>
+                <input type="text" name="to_addresses" value="{{if .emailCfg}}{{range $i, $v := .emailCfg.ToAddresses}}{{if $i}},{{end}}{{$v}}{{end}}{{end}}" placeholder="a@x.com,b@x.com" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+            </div>
+            <div class="mt-4">
+                <input type="checkbox" name="use_tls" {{if and .emailCfg .emailCfg.UseTLS}}checked{{end}} class="h-4 w-4 text-blue-600 border-gray-300 rounded">
+                <label class="ml-2 text-sm text-gray-700">TLS</label>
+            </div>
+        </div>
+        <div id="wh-cfg" {{if ne .notification.Type "webhook"}}class="hidden"{{end}}>
+            <label class="block text-sm font-medium text-gray-700">Webhook URL</label>
+            <input type="url" name="webhook_url" value="{{if .webhookCfg}}{{.webhookCfg.URL}}{{end}}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" placeholder="https://hooks.example.com/alert">
+            <label class="block text-sm font-medium text-gray-700 mt-4">自定义Headers (每行 Key: Value)</label>
+            <textarea name="webhook_headers" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm" placeholder="Authorization: Bearer token123&#10;X-Custom: value">{{if .webhookCfg}}{{range $k, $v := .webhookCfg.Headers}}{{$k}}: {{$v}}&#10;{{end}}{{end}}</textarea>
+        </div>
+        <div class="flex items-center">
+            <input type="checkbox" name="enabled" {{if .notification.Enabled}}checked{{end}} class="h-4 w-4 text-blue-600 border-gray-300 rounded">
+            <label class="ml-2 text-sm text-gray-700">启用</label>
+        </div>
+        <div class="flex space-x-3 pt-4">
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700">保存</button>
+            <a href="/settings" class="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md hover:bg-gray-50">取消</a>
+        </div>
+    </form>
+</div>
+{{end}}
+{{template "layout.html" .}}

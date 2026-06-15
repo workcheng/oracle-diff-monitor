@@ -1,0 +1,94 @@
+{{define "content"}}
+<div class="mb-6"><h1 class="text-2xl font-bold text-gray-900">{{if .pair}}编辑比对任务{{else}}新建比对任务{{end}}</h1></div>
+<div class="bg-white rounded-lg shadow p-6 max-w-2xl">
+    <form action="{{if .pair}}/pairs/{{.pair.ID}}{{else}}/pairs{{end}}" method="POST" class="space-y-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700">任务名称</label>
+            <input type="text" name="name" value="{{if .pair}}{{.pair.Name}}{{end}}" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">源库</label>
+                <select name="source_db_id" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                    <option value="">选择数据库</option>
+                    {{range .databases}}<option value="{{.ID}}" {{if $.pair}}{{if eq $.pair.SourceDBID .ID}}selected{{end}}{{end}}>{{.Name}}</option>{{end}}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">目标库</label>
+                <select name="target_db_id" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                    <option value="">选择数据库</option>
+                    {{range .databases}}<option value="{{.ID}}" {{if $.pair}}{{if eq $.pair.TargetDBID .ID}}selected{{end}}{{end}}>{{.Name}}</option>{{end}}
+                </select>
+            </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Schema (为空则当前用户)</label>
+                <input type="text" name="schema_name" value="{{if .pair}}{{.pair.SchemaName}}{{end}}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">表名过滤 (支持%)</label>
+                <input type="text" name="table_filter" value="{{if .pair}}{{.pair.TableFilter}}{{end}}" placeholder="EMP%" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+            </div>
+        </div>
+        <div class="flex items-center">
+            <input type="checkbox" name="enabled" {{if not .pair}}checked{{else}}{{if .pair.Enabled}}checked{{end}}{{end}} class="h-4 w-4 text-blue-600 border-gray-300 rounded">
+            <label class="ml-2 text-sm text-gray-700">启用</label>
+        </div>
+        <div class="flex space-x-3 pt-4">
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700">保存</button>
+            <a href="/pairs" class="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md hover:bg-gray-50">取消</a>
+        </div>
+    </form>
+</div>
+
+{{if .pair}}
+<div class="bg-white rounded-lg shadow p-6 max-w-2xl mt-6">
+    <h2 class="text-lg font-medium text-gray-900 mb-4">通知配置</h2>
+    <p class="text-sm text-gray-500 mb-4">配置比对完成后发送通知的渠道和触发条件</p>
+    <form action="/pairs/{{.pair.ID}}/notifications" method="POST" class="space-y-4">
+        {{if .notifications}}
+        <div class="border border-gray-200 rounded-lg overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">通知渠道</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">有差异时</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">出错时</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">成功时</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {{range .notifications}}
+                    {{$link := index $.notifMap .ID}}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 text-sm">
+                            <span class="font-medium text-gray-900">{{.Name}}</span>
+                            <span class="ml-2 px-2 py-0.5 text-xs rounded-full {{if eq .Type "email"}}bg-blue-100 text-blue-700{{else}}bg-purple-100 text-purple-700{{end}}">{{if eq .Type "email"}}邮件{{else}}Webhook{{end}}</span>
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <input type="checkbox" name="notif_{{.ID}}_diff" {{if and $link $link.OnDiff}}checked{{end}} class="h-4 w-4 text-blue-600 border-gray-300 rounded">
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <input type="checkbox" name="notif_{{.ID}}_error" {{if and $link $link.OnError}}checked{{end}} class="h-4 w-4 text-blue-600 border-gray-300 rounded">
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <input type="checkbox" name="notif_{{.ID}}_success" {{if and $link $link.OnSuccess}}checked{{end}} class="h-4 w-4 text-blue-600 border-gray-300 rounded">
+                        </td>
+                    </tr>
+{{end}}
+                </tbody>
+            </table>
+        </div>
+        {{else}}
+        <p class="text-sm text-gray-500">暂无通知渠道，请先在<a href="/settings" class="text-blue-600 hover:underline">设置页面</a>添加</p>
+        {{end}}
+        <div class="flex space-x-3 pt-4">
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700">保存通知配置</button>
+        </div>
+    </form>
+</div>
+{{end}}
+{{end}}
+{{template "layout.html" .}}

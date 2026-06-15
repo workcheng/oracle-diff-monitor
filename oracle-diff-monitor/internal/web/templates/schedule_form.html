@@ -1,0 +1,28 @@
+{{define "content"}}
+<div class="mb-6"><h1 class="text-2xl font-bold text-gray-900">{{.title}}</h1></div>
+<div class="bg-white rounded-lg shadow p-6 max-w-2xl">
+    <form action="/settings/schedules/{{.schedule.ID}}" method="POST" class="space-y-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700">比对任务</label>
+            <select name="pair_id" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                <option value="">选择任务</option>
+                {{range .pairs}}<option value="{{.ID}}" {{if eq $.schedule.PairID .ID}}selected{{end}}>{{.Name}}</option>{{end}}
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Cron表达式 (秒分时日月星期)</label>
+            <input type="text" name="cron_expr" value="{{.schedule.CronExpr}}" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 font-mono">
+            <p class="mt-1 text-sm text-gray-500">如 <code class="bg-gray-100 px-1">0 0 * * *</code> 每小时, <code class="bg-gray-100 px-1">0 0 */6 * *</code> 每6小时</p>
+        </div>
+        <div class="flex items-center">
+            <input type="checkbox" name="enabled" {{if .schedule.Enabled}}checked{{end}} class="h-4 w-4 text-blue-600 border-gray-300 rounded">
+            <label class="ml-2 text-sm text-gray-700">启用</label>
+        </div>
+        <div class="flex space-x-3 pt-4">
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700">保存</button>
+            <a href="/settings" class="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md hover:bg-gray-50">取消</a>
+        </div>
+    </form>
+</div>
+{{end}}
+{{template "layout.html" .}}

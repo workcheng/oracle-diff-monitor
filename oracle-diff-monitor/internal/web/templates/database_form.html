@@ -1,0 +1,46 @@
+{{define "content"}}
+<div class="mb-6"><h1 class="text-2xl font-bold text-gray-900">{{if .db}}编辑数据库{{else}}添加数据库{{end}}</h1></div>
+<div class="bg-white rounded-lg shadow p-6 max-w-2xl">
+    <form action="{{if .db}}/databases/{{.db.ID}}{{else}}/databases{{end}}" method="POST" class="space-y-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700">连接名称</label>
+            <input type="text" name="name" value="{{if .db}}{{.db.Name}}{{end}}" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+        </div>
+        <div class="grid grid-cols-3 gap-4">
+            <div class="col-span-2">
+                <label class="block text-sm font-medium text-gray-700">主机地址</label>
+                <input type="text" name="host" value="{{if .db}}{{.db.Host}}{{end}}" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">端口</label>
+                <input type="number" name="port" value="{{if .db}}{{.db.Port}}{{else}}1521{{end}}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+            </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Service Name</label>
+                <input type="text" name="service_name" value="{{if .db}}{{.db.ServiceName}}{{end}}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">SID</label>
+                <input type="text" name="sid" value="{{if .db}}{{.db.SID}}{{end}}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+            </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">用户名</label>
+                <input type="text" name="username" value="{{if .db}}{{.db.Username}}{{end}}" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">密码</label>
+                <input type="password" name="password" {{if not .db}}required{{end}} class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" placeholder="{{if .db}}留空则不修改{{end}}">
+            </div>
+        </div>
+        <div class="flex space-x-3 pt-4">
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700">保存</button>
+            <a href="/databases" class="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md hover:bg-gray-50">取消</a>
+        </div>
+    </form>
+</div>
+{{end}}
+{{template "layout.html" .}}

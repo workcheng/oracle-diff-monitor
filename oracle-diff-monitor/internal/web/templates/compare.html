@@ -1,0 +1,50 @@
+{{define "content"}}
+<div class="flex justify-between items-center mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-900">比对任务</h1>
+        <p class="mt-1 text-sm text-gray-500">配置源库与目标库之间的表结构比对任务</p>
+    </div>
+    <a href="/pairs/new" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700">新建任务</a>
+</div>
+<div class="bg-white rounded-lg shadow overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">名称</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">源库</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">目标库</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Schema</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">状态</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th></tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+            {{range .pairs}}{{$src := index $.dbMap .SourceDBID}}{{$tgt := index $.dbMap .TargetDBID}}
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 text-sm font-medium text-gray-900">{{.Name}}</td>
+                <td class="px-6 py-4 text-sm text-gray-500">{{if $src}}{{$src.Name}}{{else}}#{{.SourceDBID}}{{end}}</td>
+                <td class="px-6 py-4 text-sm text-gray-500">{{if $tgt}}{{$tgt.Name}}{{else}}#{{.TargetDBID}}{{end}}</td>
+                <td class="px-6 py-4 text-sm">{{if .SchemaName}}{{.SchemaName}}{{else}}<span class="text-gray-400">当前用户</span>{{end}}</td>
+                <td class="px-6 py-4">{{if .Enabled}}<span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">启用</span>{{else}}<span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">禁用</span>{{end}}</td>
+                <td class="px-6 py-4 text-sm space-x-2">
+                    <button onclick="runPair({{.ID}})" class="text-green-600 hover:text-green-800 text-sm">执行</button>
+                    <a href="/pairs/{{.ID}}/edit" class="text-blue-600 hover:text-blue-800 text-sm">编辑</a>
+                    <form action="/pairs/{{.ID}}/delete" method="POST" class="inline" onsubmit="return confirm('确定删除?')">
+                        <button type="submit" class="text-red-600 hover:text-red-800 text-sm">删除</button>
+                    </form>
+                </td>
+            </tr>
+            {{else}}<tr><td colspan="6" class="px-6 py-8 text-center text-gray-500">暂无比对任务</td></tr>{{end}}
+        </tbody>
+    </table>
+</div>
+<div id="run-result" class="mt-4"></div>
+<script>
+function runPair(id) {
+    var btn = event.target;
+    btn.disabled = true; btn.textContent = '执行中...';
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/pairs/' + id + '/run', true);
+    xhr.onload = function() {
+        var d = JSON.parse(xhr.responseText);
+        var div = document.getElementById('run-result');
+        if (d.success) { div.className = 'bg-green-50 text-green-700 p-3 rounded'; div.textContent = '比对任务已启动'; setTimeout(function(){window.location.reload()}, 2000); }
+    };
+    xhr.send();
+}
+</script>
+{{end}}
+{{template "layout.html" .}}

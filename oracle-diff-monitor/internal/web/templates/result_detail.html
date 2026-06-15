@@ -1,0 +1,77 @@
+{{define "content"}}
+<div class="mb-6">
+    <div class="flex justify-between items-start">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">差异详情</h1>
+            <p class="mt-1 text-sm text-gray-500">
+                比对任务: <strong>{{.pairName}}</strong> |
+                源库: <strong>{{.sourceDB}}</strong> → 目标库: <strong>{{.targetDB}}</strong> |
+                执行: {{.run.StartedAt.Format "2006-01-02 15:04:05"}} |
+                耗时: {{Duration .run}} |
+                状态:
+                {{if eq .run.Status "success"}}
+                <span class="text-green-600">成功</span>
+                {{else if eq .run.Status "running"}}
+                <span data-running="true" class="text-yellow-700">运行中</span>
+                {{else}}
+                <span class="text-red-600">失败</span>
+                {{end}}
+            </p>
+        </div>
+        <a href="/runs/{{.run.ID}}/export" class="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md hover:bg-gray-50">导出 JSON</a>
+    </div>
+    <div class="mt-2 flex space-x-4 text-sm">
+        扫描表 <strong>{{.run.TotalTables}}</strong> |
+        已处理 <strong>{{.run.ProcessedTables}}</strong> |
+        差异表 <strong class="{{if gt .run.DiffTables 0}}text-red-600{{end}}">{{.run.DiffTables}}</strong> |
+        总差异 <strong class="{{if gt (len .diffs) 0}}text-red-600{{end}}">{{len .diffs}}</strong>
+    </div>
+</div>
+
+{{if eq .run.Status "running"}}
+<div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+    <p class="text-sm text-yellow-800 font-medium">{{if .run.ProgressMsg}}{{.run.ProgressMsg}}{{else}}正在执行{{end}}</p>
+    <p class="mt-1 text-sm text-yellow-700">
+        {{if gt .run.TotalTables 0}}进度: {{.run.ProcessedTables}} / {{.run.TotalTables}}{{else}}正在准备表清单{{end}}
+        {{if .run.CurrentTable}}，当前表: <span class="font-mono">{{.run.CurrentTable}}</span>{{end}}
+    </p>
+</div>
+{{else if eq .run.Status "failed"}}
+<div class="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
+    <p class="text-sm text-red-800 font-medium">{{if .run.ProgressMsg}}{{.run.ProgressMsg}}{{else}}比对失败{{end}}</p>
+    {{if .run.CurrentTable}}<p class="mt-1 text-sm text-red-700">失败时正在处理: <span class="font-mono">{{.run.CurrentTable}}</span></p>{{end}}
+    {{if .run.ErrorMsg}}<pre class="mt-2 text-xs text-red-700 whitespace-pre-wrap break-all">{{.run.ErrorMsg}}</pre>{{end}}
+</div>
+{{end}}
+
+{{if and (ne .run.Status "running") (eq (len .diffs) 0)}}
+<div class="bg-green-50 border-l-4 border-green-400 p-4"><p class="text-sm text-green-700 font-medium">未发现差异，结构完全一致</p></div>
+{{else}}
+{{range $table, $items := .grouped}}
+<div class="bg-white rounded-lg shadow overflow-hidden mb-4">
+    <div class="px-6 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+        <h3 class="text-lg font-medium">{{$table}}</h3>
+        <span class="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">{{len $items}} 处差异</span>
+    </div>
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead><tr class="bg-gray-50"><th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">差异类型</th><th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">对象</th><th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">源库</th><th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">目标库</th></tr></thead>
+        <tbody class="divide-y divide-gray-200">
+            {{range $items}}<tr class="hover:bg-red-50">
+                <td class="px-4 py-2 text-sm font-medium text-red-700">{{DiffTypeLabel .DiffType}}</td>
+                <td class="px-4 py-2 text-sm text-gray-700">{{.ColumnName}}</td>
+                <td class="px-4 py-2 text-sm text-gray-600">{{.SourceValue}}</td>
+                <td class="px-4 py-2 text-sm text-gray-600">{{.TargetValue}}</td>
+            </tr>{{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}
+{{end}}
+<div class="mt-4"><a href="/runs" class="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md hover:bg-gray-50">返回结果列表</a></div>
+<script>
+if (document.querySelector('[data-running="true"]')) {
+    setTimeout(function(){ window.location.reload(); }, 5000);
+}
+</script>
+{{end}}
+{{template "layout.html" .}}
