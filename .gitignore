@@ -31,3 +31,4 @@ Thumbs.db
 # Mimicode plans
 .mimocode/
 oracle-diff-monitor/data/*.db
+.codex-go-smoke/
