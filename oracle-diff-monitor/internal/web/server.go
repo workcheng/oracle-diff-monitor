@@ -122,6 +122,7 @@ func (s *Server) registerRoutes() {
 	r.POST("/settings/schedules/:id/delete", s.deleteSchedule)
 
 	r.POST("/pairs/:id/notifications", s.updatePairNotifications)
+	r.POST("/pairs/:id/select-tables", s.saveSelectedTables)
 
 	r.GET("/api/stats", s.apiStats)
 	r.GET("/api/runs/latest", s.apiLatestRuns)
@@ -775,6 +776,25 @@ func (s *Server) updatePairNotifications(c *gin.Context) {
 		log.Printf("updatePairNotifications: saved successfully")
 	}
 	c.Redirect(http.StatusFound, "/pairs/"+strconv.FormatInt(pairID, 10)+"/edit")
+}
+
+func (s *Server) saveSelectedTables(c *gin.Context) {
+	pairID, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	selectedTables := c.PostForm("selected_tables")
+
+	pair, err := s.store.GetComparePair(pairID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "pair not found"})
+		return
+	}
+	pair.SelectedTables = selectedTables
+	if err := s.store.UpdateComparePair(pair); err != nil {
+		log.Printf("saveSelectedTables: update error: %v", err)
+		c.JSON(http.StatusOK, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	log.Printf("saveSelectedTables: pair %d saved %d tables", pairID, len(strings.Split(selectedTables, ",")))
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
 // ---- API ----

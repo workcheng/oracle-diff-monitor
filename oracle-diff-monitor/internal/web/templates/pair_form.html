@@ -35,11 +35,17 @@
 
         {{if .pair}}
         <div class="border-t border-gray-200 pt-4">
-            <h3 class="text-sm font-medium text-gray-900 mb-2">选择比对表（不勾选则比对全部）</h3>
+            <h3 class="text-sm font-medium text-gray-900 mb-2">选择比对表</h3>
+            <p class="text-xs text-gray-500 mb-2">勾选需要比对的表（不勾选则比对全部）</p>
             <div class="space-y-2">
+                <div id="selected-summary" class="{{if not .pair.SelectedTables}}hidden{{end}} text-sm text-green-700 bg-green-50 border border-green-200 rounded-md px-3 py-2">
+                    已选 <strong id="summary-count">0</strong> 张表：
+                    <span id="summary-list" class="font-mono text-xs"></span>
+                </div>
                 <div class="flex space-x-2">
                     <input type="text" id="table-search" placeholder="搜索表名..." class="flex-1 border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm">
                     <button type="button" id="load-tables-btn" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700" onclick="loadTables()">加载表清单</button>
+                    <button type="button" id="confirm-tables-btn" class="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 hidden" onclick="confirmTables()">确认选择</button>
                 </div>
                 <input type="hidden" name="selected_tables" id="selected-tables" value="{{if .pair}}{{.pair.SelectedTables}}{{end}}">
                 <div id="table-list" class="border border-gray-200 rounded-lg max-h-60 overflow-y-auto hidden">
@@ -50,6 +56,7 @@
                     </div>
                     <div id="table-items" class="divide-y divide-gray-100"></div>
                 </div>
+                <div id="save-msg" class="hidden text-sm text-green-700"></div>
             </div>
         </div>
         {{end}}
@@ -135,12 +142,14 @@ function loadTables() {
             allTables = data.tables || [];
             var saved = document.getElementById('selected-tables').value;
             if (saved) {
-                saved.split(',').forEach(function(t) {
+                var parts = saved.split(',');
+                parts.forEach(function(t) {
                     t = t.trim();
                     if (t && preSelected.indexOf(t) === -1) preSelected.push(t);
                 });
             }
             renderTables();
+            document.getElementById('confirm-tables-btn').classList.remove('hidden');
         })
         .catch(function(err) {
             btn.disabled = false;
@@ -183,8 +192,62 @@ function toggleAll() {
     updateSelected();
 }
 
+function confirmTables() {
+    var names = document.getElementById('selected-tables').value;
+    var btn = document.getElementById('confirm-tables-btn');
+    btn.disabled = true;
+    btn.textContent = '保存中...';
+
+    var form = new FormData();
+    form.append('selected_tables', names);
+
+    fetch('/pairs/{{.pair.ID}}/select-tables', { method: 'POST', body: form })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            btn.disabled = false;
+            btn.textContent = '确认选择';
+            if (data.success) {
+                showSummary(names);
+                document.getElementById('save-msg').textContent = '✓ 表选择已保存';
+                document.getElementById('save-msg').classList.remove('hidden');
+                setTimeout(function() { document.getElementById('save-msg').classList.add('hidden'); }, 3000);
+            } else {
+                document.getElementById('save-msg').textContent = '保存失败: ' + data.error;
+                document.getElementById('save-msg').classList.remove('hidden');
+            }
+        })
+        .catch(function(err) {
+            btn.disabled = false;
+            btn.textContent = '确认选择';
+            document.getElementById('save-msg').textContent = '请求失败: ' + err.message;
+            document.getElementById('save-msg').classList.remove('hidden');
+        });
+}
+
+function showSummary(names) {
+    if (!names) {
+        document.getElementById('selected-summary').classList.add('hidden');
+        return;
+    }
+    var parts = names.split(',').filter(function(t) { return t.trim(); });
+    document.getElementById('summary-count').textContent = parts.length;
+    if (parts.length > 0) {
+        var display = parts.slice(0, 5).join(', ');
+        if (parts.length > 5) display += '...';
+        document.getElementById('summary-list').textContent = display;
+        document.getElementById('selected-summary').classList.remove('hidden');
+    } else {
+        document.getElementById('selected-summary').classList.add('hidden');
+    }
+}
+
 document.getElementById('table-search').addEventListener('input', renderTables);
 
+// On page load: show saved summary and auto-load tables for editing
+var savedVal = document.getElementById('selected-tables').value;
+if (savedVal) {
+    showSummary(savedVal);
+}
 if (document.querySelector('#table-list')) {
     loadTables();
 }
