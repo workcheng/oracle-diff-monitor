@@ -45,6 +45,107 @@
 
 {{if .pair}}
 <div class="bg-white rounded-lg shadow p-6 max-w-2xl mt-6">
+    <h2 class="text-lg font-medium text-gray-900 mb-4">选择比对表</h2>
+    <p class="text-sm text-gray-500 mb-4">勾选需要比对的表（不勾选则比对全部）</p>
+    <div class="space-y-3">
+        <div class="flex space-x-2">
+            <input type="text" id="table-search" placeholder="搜索表名..." class="flex-1 border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm">
+            <button type="button" id="load-tables-btn" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700" onclick="loadTables()">加载表清单</button>
+        </div>
+        <input type="hidden" name="selected_tables" id="selected-tables" value="{{if .pair}}{{.pair.SelectedTables}}{{end}}">
+        <div id="table-list" class="border border-gray-200 rounded-lg max-h-60 overflow-y-auto hidden">
+            <div class="p-2 bg-gray-50 border-b border-gray-200 flex items-center">
+                <input type="checkbox" id="select-all" onchange="toggleAll()" class="h-4 w-4 text-blue-600 border-gray-300 rounded">
+                <label for="select-all" class="ml-2 text-xs text-gray-600">全选/取消</label>
+                <span id="selected-count" class="ml-auto text-xs text-gray-500">已选 0 张</span>
+            </div>
+            <div id="table-items" class="divide-y divide-gray-100">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+var allTables = [];
+var preSelected = {{if .selectedTableJSON}}{{.selectedTableJSON}}{{else}}[]{{end}};
+
+function loadTables() {
+    var btn = document.getElementById('load-tables-btn');
+    btn.disabled = true;
+    btn.textContent = '加载中...';
+    document.getElementById('table-list').classList.remove('hidden');
+    document.getElementById('table-items').innerHTML = '<div class="p-4 text-center text-sm text-gray-500">加载中...</div>';
+
+    fetch('/pairs/{{.pair.ID}}/tables')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            btn.disabled = false;
+            btn.textContent = '重新加载';
+            if (!data.success) {
+                document.getElementById('table-items').innerHTML = '<div class="p-4 text-center text-sm text-red-500">加载失败: ' + data.error + '</div>';
+                return;
+            }
+            allTables = data.tables || [];
+            // Merge pre-selected from save state
+            var saved = document.getElementById('selected-tables').value;
+            if (saved) {
+                saved.split(',').forEach(function(t) {
+                    t = t.trim();
+                    if (t && preSelected.indexOf(t) === -1) preSelected.push(t);
+                });
+            }
+            renderTables();
+        })
+        .catch(function(err) {
+            btn.disabled = false;
+            btn.textContent = '加载失败，重试';
+            document.getElementById('table-items').innerHTML = '<div class="p-4 text-center text-sm text-red-500">请求失败: ' + err.message + '</div>';
+        });
+}
+
+function renderTables() {
+    var search = document.getElementById('table-search').value.toUpperCase();
+    var items = document.getElementById('table-items');
+    var filtered = allTables.filter(function(t) { return t.toUpperCase().indexOf(search) !== -1; });
+    if (filtered.length === 0) {
+        items.innerHTML = '<div class="p-4 text-center text-sm text-gray-500">无匹配表</div>';
+        return;
+    }
+    var html = '';
+    filtered.forEach(function(t) {
+        var checked = preSelected.indexOf(t) !== -1 ? 'checked' : '';
+        html += '<label class="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm">'
+            + '<input type="checkbox" value="' + t + '" ' + checked + ' onchange="updateSelected()" class="h-4 w-4 text-blue-600 border-gray-300 rounded">'
+            + '<span class="ml-2 text-gray-700 font-mono">' + t + '</span>'
+            + '</label>';
+    });
+    items.innerHTML = html;
+    updateSelected();
+}
+
+function updateSelected() {
+    var checks = document.querySelectorAll('#table-items input[type=checkbox]:checked');
+    var names = [];
+    checks.forEach(function(c) { names.push(c.value); });
+    document.getElementById('selected-tables').value = names.join(',');
+    document.getElementById('selected-count').textContent = '已选 ' + names.length + ' 张';
+}
+
+function toggleAll() {
+    var checked = document.getElementById('select-all').checked;
+    document.querySelectorAll('#table-items input[type=checkbox]').forEach(function(c) { c.checked = checked; });
+    updateSelected();
+}
+
+document.getElementById('table-search').addEventListener('input', renderTables);
+
+// Auto-load tables on page load if editing
+if (document.querySelector('#table-list')) {
+    loadTables();
+}
+</script>
+
+<div class="bg-white rounded-lg shadow p-6 max-w-2xl mt-6">
     <h2 class="text-lg font-medium text-gray-900 mb-4">通知配置</h2>
     <p class="text-sm text-gray-500 mb-4">配置比对完成后发送通知的渠道和触发条件</p>
     <form action="/pairs/{{.pair.ID}}/notifications" method="POST" class="space-y-4">

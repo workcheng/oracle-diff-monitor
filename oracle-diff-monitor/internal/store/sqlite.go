@@ -127,6 +127,9 @@ func (s *Store) migrate() error {
 			return err
 		}
 	}
+	if err := s.ensureColumn("compare_pairs", "selected_tables", "TEXT DEFAULT ''"); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -230,8 +233,8 @@ func (s *Store) DeleteDatabase(id int64) error {
 
 func (s *Store) CreateComparePair(p *models.ComparePair) (int64, error) {
 	res, err := s.db.Exec(
-		`INSERT INTO compare_pairs (name, source_db_id, target_db_id, schema_name, table_filter, enabled) VALUES (?, ?, ?, ?, ?, ?)`,
-		p.Name, p.SourceDBID, p.TargetDBID, p.SchemaName, p.TableFilter, boolToInt(p.Enabled),
+		`INSERT INTO compare_pairs (name, source_db_id, target_db_id, schema_name, table_filter, selected_tables, enabled) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		p.Name, p.SourceDBID, p.TargetDBID, p.SchemaName, p.TableFilter, p.SelectedTables, boolToInt(p.Enabled),
 	)
 	if err != nil {
 		return 0, err
@@ -241,11 +244,11 @@ func (s *Store) CreateComparePair(p *models.ComparePair) (int64, error) {
 
 func (s *Store) GetComparePair(id int64) (*models.ComparePair, error) {
 	row := s.db.QueryRow(
-		`SELECT id, name, source_db_id, target_db_id, COALESCE(schema_name,''), COALESCE(table_filter,''), enabled, created_at FROM compare_pairs WHERE id = ?`, id,
+		`SELECT id, name, source_db_id, target_db_id, COALESCE(schema_name,''), COALESCE(table_filter,''), COALESCE(selected_tables,''), enabled, created_at FROM compare_pairs WHERE id = ?`, id,
 	)
 	p := &models.ComparePair{}
 	var enabled int
-	err := row.Scan(&p.ID, &p.Name, &p.SourceDBID, &p.TargetDBID, &p.SchemaName, &p.TableFilter, &enabled, &p.CreatedAt)
+	err := row.Scan(&p.ID, &p.Name, &p.SourceDBID, &p.TargetDBID, &p.SchemaName, &p.TableFilter, &p.SelectedTables, &enabled, &p.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -255,7 +258,7 @@ func (s *Store) GetComparePair(id int64) (*models.ComparePair, error) {
 
 func (s *Store) ListComparePairs() ([]*models.ComparePair, error) {
 	rows, err := s.db.Query(
-		`SELECT id, name, source_db_id, target_db_id, COALESCE(schema_name,''), COALESCE(table_filter,''), enabled, created_at FROM compare_pairs ORDER BY name`,
+		`SELECT id, name, source_db_id, target_db_id, COALESCE(schema_name,''), COALESCE(table_filter,''), COALESCE(selected_tables,''), enabled, created_at FROM compare_pairs ORDER BY name`,
 	)
 	if err != nil {
 		return nil, err
@@ -265,7 +268,7 @@ func (s *Store) ListComparePairs() ([]*models.ComparePair, error) {
 	for rows.Next() {
 		p := &models.ComparePair{}
 		var enabled int
-		if err := rows.Scan(&p.ID, &p.Name, &p.SourceDBID, &p.TargetDBID, &p.SchemaName, &p.TableFilter, &enabled, &p.CreatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &p.SourceDBID, &p.TargetDBID, &p.SchemaName, &p.TableFilter, &p.SelectedTables, &enabled, &p.CreatedAt); err != nil {
 			return nil, err
 		}
 		p.Enabled = enabled == 1
@@ -276,8 +279,8 @@ func (s *Store) ListComparePairs() ([]*models.ComparePair, error) {
 
 func (s *Store) UpdateComparePair(p *models.ComparePair) error {
 	_, err := s.db.Exec(
-		`UPDATE compare_pairs SET name=?, source_db_id=?, target_db_id=?, schema_name=?, table_filter=?, enabled=? WHERE id=?`,
-		p.Name, p.SourceDBID, p.TargetDBID, p.SchemaName, p.TableFilter, boolToInt(p.Enabled), p.ID,
+		`UPDATE compare_pairs SET name=?, source_db_id=?, target_db_id=?, schema_name=?, table_filter=?, selected_tables=?, enabled=? WHERE id=?`,
+		p.Name, p.SourceDBID, p.TargetDBID, p.SchemaName, p.TableFilter, p.SelectedTables, boolToInt(p.Enabled), p.ID,
 	)
 	return err
 }

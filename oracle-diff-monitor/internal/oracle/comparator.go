@@ -20,16 +20,16 @@ func NewComparator(source, target *Client) *Comparator {
 	return &Comparator{source: source, target: target}
 }
 
-func (c *Comparator) Compare(schema, tableFilter string) ([]models.DiffDetail, error) {
-	return c.CompareWithResume(schema, tableFilter, nil, nil, nil)
+func (c *Comparator) Compare(schema, tableFilter string, selectedTables []string) ([]models.DiffDetail, error) {
+	return c.CompareWithResume(schema, tableFilter, nil, nil, nil, selectedTables)
 }
 
-func (c *Comparator) CompareWithProgress(schema, tableFilter string, progress ProgressFunc) ([]models.DiffDetail, error) {
-	return c.CompareWithResume(schema, tableFilter, nil, progress, nil)
+func (c *Comparator) CompareWithProgress(schema, tableFilter string, progress ProgressFunc, selectedTables []string) ([]models.DiffDetail, error) {
+	return c.CompareWithResume(schema, tableFilter, nil, progress, nil, selectedTables)
 }
 
 // CompareWithResume compares tables one-by-one with progress and resume support.
-func (c *Comparator) CompareWithResume(schema, tableFilter string, completed map[string]bool, progress ProgressFunc, onTable TableResultFunc) ([]models.DiffDetail, error) {
+func (c *Comparator) CompareWithResume(schema, tableFilter string, completed map[string]bool, progress ProgressFunc, onTable TableResultFunc, selectedTables []string) ([]models.DiffDetail, error) {
 	var diffs []models.DiffDetail
 
 	sourceTables, err := c.source.GetTables(schema, tableFilter)
@@ -57,6 +57,18 @@ func (c *Comparator) CompareWithResume(schema, tableFilter string, completed map
 		tableList = append(tableList, t)
 	}
 	sort.Strings(tableList)
+
+	// If specific tables are selected, filter the list
+	selectedSet := toSet(selectedTables)
+	if len(selectedSet) > 0 {
+		filtered := make([]string, 0, len(selectedTables))
+		for _, t := range tableList {
+			if selectedSet[t] {
+				filtered = append(filtered, t)
+			}
+		}
+		tableList = filtered
+	}
 
 	processed := 0
 	for _, t := range tableList {
@@ -118,7 +130,7 @@ func (c *Comparator) CompareWithResume(schema, tableFilter string, completed map
 // CompareAllTables is an optimized batch version: fetches ALL metadata upfront
 // (columns, indexes, constraints) for both source and target in a handful of queries,
 // then compares in memory table-by-table.
-func (c *Comparator) CompareAllTables(schema, tableFilter string, progress ProgressFunc) ([]models.DiffDetail, error) {
+func (c *Comparator) CompareAllTables(schema, tableFilter string, progress ProgressFunc, selectedTables []string) ([]models.DiffDetail, error) {
 	var diffs []models.DiffDetail
 
 	// 1) Get table lists (parallel)
@@ -162,6 +174,18 @@ func (c *Comparator) CompareAllTables(schema, tableFilter string, progress Progr
 	}
 	sort.Strings(tableList)
 
+	// If specific tables are selected, filter the list
+	selectedSet := toSet(selectedTables)
+	if len(selectedSet) > 0 {
+		filtered := make([]string, 0, len(selectedTables))
+		for _, t := range tableList {
+			if selectedSet[t] {
+				filtered = append(filtered, t)
+			}
+		}
+		tableList = filtered
+	}
+
 	owner := schema
 	if owner == "" {
 		owner = c.source.config.Username
@@ -173,6 +197,16 @@ func (c *Comparator) CompareAllTables(schema, tableFilter string, progress Progr
 		if sourceSet[t] && targetSet[t] {
 			compareTables = append(compareTables, t)
 		}
+	}
+	// Further filter compareTables by selected set
+	if len(selectedSet) > 0 {
+		filtered := compareTables[:0]
+		for _, t := range compareTables {
+			if selectedSet[t] {
+				filtered = append(filtered, t)
+			}
+		}
+		compareTables = filtered
 	}
 
 	// 3) Batch fetch all metadata (parallel source/target)

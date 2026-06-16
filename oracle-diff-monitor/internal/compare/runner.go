@@ -3,6 +3,7 @@ package compare
 import (
 	"fmt"
 	"log"
+	"strings"
 	"oracle-diff-monitor/internal/models"
 	"oracle-diff-monitor/internal/notifier"
 	"oracle-diff-monitor/internal/oracle"
@@ -61,6 +62,15 @@ func RunComparison(s *store.Store, pairID int64) (*models.CompareRun, []models.D
 	comp := oracle.NewComparator(sourceClient, targetClient)
 
 	var totalTables int
+	var selectedTableList []string
+	if pair.SelectedTables != "" {
+		for _, t := range strings.Split(pair.SelectedTables, ",") {
+			t = strings.TrimSpace(t)
+			if t != "" {
+				selectedTableList = append(selectedTableList, t)
+			}
+		}
+	}
 	diffs, err := comp.CompareAllTables(pair.SchemaName, pair.TableFilter, func(processed, total int, table, message string) {
 		totalTables = total
 		run.TotalTables = total
@@ -68,7 +78,7 @@ func RunComparison(s *store.Store, pairID int64) (*models.CompareRun, []models.D
 		run.CurrentTable = table
 		run.ProgressMsg = message
 		s.UpdateCompareRunProgress(run)
-	})
+	}, selectedTableList)
 	if err != nil {
 		run.Status = "failed"
 		run.ErrorMsg = fmt.Sprintf("比对失败: %v", err)

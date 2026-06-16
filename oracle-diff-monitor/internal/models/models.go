@@ -17,14 +17,15 @@ type Database struct {
 }
 
 type ComparePair struct {
-	ID          int64     `json:"id"`
-	Name        string    `json:"name"`
-	SourceDBID  int64     `json:"source_db_id"`
-	TargetDBID  int64     `json:"target_db_id"`
-	SchemaName  string    `json:"schema_name"`
-	TableFilter string    `json:"table_filter"`
-	Enabled     bool      `json:"enabled"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID             int64     `json:"id"`
+	Name           string    `json:"name"`
+	SourceDBID     int64     `json:"source_db_id"`
+	TargetDBID     int64     `json:"target_db_id"`
+	SchemaName     string    `json:"schema_name"`
+	TableFilter    string    `json:"table_filter"`
+	SelectedTables string    `json:"selected_tables"`
+	Enabled        bool      `json:"enabled"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 type CompareRun struct {

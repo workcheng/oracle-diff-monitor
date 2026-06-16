@@ -105,6 +105,7 @@ func (s *Server) registerRoutes() {
 	r.POST("/pairs/:id", s.updatePair)
 	r.POST("/pairs/:id/delete", s.deletePair)
 	r.POST("/pairs/:id/run", s.runPair)
+	r.GET("/pairs/:id/tables", s.listPairTables)
 
 	r.GET("/runs", s.listRuns)
 	r.GET("/runs/:id", s.runDetail)
@@ -284,12 +285,13 @@ func (s *Server) createPair(c *gin.Context) {
 	sourceID, _ := strconv.ParseInt(c.PostForm("source_db_id"), 10, 64)
 	targetID, _ := strconv.ParseInt(c.PostForm("target_db_id"), 10, 64)
 	pair := &models.ComparePair{
-		Name:        c.PostForm("name"),
-		SourceDBID:  sourceID,
-		TargetDBID:  targetID,
-		SchemaName:  c.PostForm("schema_name"),
-		TableFilter: c.PostForm("table_filter"),
-		Enabled:     c.PostForm("enabled") == "on",
+		Name:           c.PostForm("name"),
+		SourceDBID:     sourceID,
+		TargetDBID:     targetID,
+		SchemaName:     c.PostForm("schema_name"),
+		TableFilter:    c.PostForm("table_filter"),
+		SelectedTables: c.PostForm("selected_tables"),
+		Enabled:        c.PostForm("enabled") == "on",
 	}
 
 	if _, err := s.store.CreateComparePair(pair); err != nil {
@@ -316,12 +318,31 @@ func (s *Server) editPairForm(c *gin.Context) {
 		notifMap[l.NotificationID] = l
 	}
 
+	// Parse selected tables into a slice and JSON for the template
+	var selectedTableList []string
+	if pair.SelectedTables != "" {
+		for _, t := range strings.Split(pair.SelectedTables, ",") {
+			t = strings.TrimSpace(t)
+			if t != "" {
+				selectedTableList = append(selectedTableList, t)
+			}
+		}
+	}
+	selectedTableJSON := "[]"
+	if len(selectedTableList) > 0 {
+		if b, err := json.Marshal(selectedTableList); err == nil {
+			selectedTableJSON = string(b)
+		}
+	}
+
 	c.HTML(http.StatusOK, "pair_form.html", gin.H{
-		"title":         "编辑比对任务",
-		"pair":          pair,
-		"databases":     dbs,
-		"notifications": notifs,
-		"notifMap":      notifMap,
+		"title":            "编辑比对任务",
+		"pair":             pair,
+		"databases":        dbs,
+		"notifications":    notifs,
+		"notifMap":         notifMap,
+		"selectedTables":   selectedTableList,
+		"selectedTableJSON": selectedTableJSON,
 	})
 }
 
@@ -336,6 +357,7 @@ func (s *Server) updatePair(c *gin.Context) {
 		TargetDBID:  targetID,
 		SchemaName:  c.PostForm("schema_name"),
 		TableFilter: c.PostForm("table_filter"),
+		SelectedTables: c.PostForm("selected_tables"),
 		Enabled:     c.PostForm("enabled") == "on",
 	}
 	if err := s.store.UpdateComparePair(pair); err != nil {
@@ -350,6 +372,45 @@ func (s *Server) deletePair(c *gin.Context) {
 	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
 	s.store.DeleteComparePair(id)
 	c.Redirect(http.StatusFound, "/pairs")
+}
+
+func (s *Server) listPairTables(c *gin.Context) {
+	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	pair, err := s.store.GetComparePair(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "pair not found"})
+		return
+	}
+
+	// Use source DB to list available tables
+	db, err := s.store.GetDatabase(pair.SourceDBID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "source db not found"})
+		return
+	}
+
+	client, err := oracle.NewClient(db)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+	defer client.Close()
+
+	tables, err := client.GetTables(pair.SchemaName, pair.TableFilter)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	// Parse already-selected tables
+	selectedSet := make(map[string]bool)
+	if pair.SelectedTables != "" {
+		for _, t := range strings.Split(pair.SelectedTables, ",") {
+			selectedSet[strings.TrimSpace(t)] = true
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "tables": tables, "selected": selectedSet})
 }
 
 func (s *Server) runPair(c *gin.Context) {
