@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"oracle-diff-monitor/internal/compare"
+	"oracle-diff-monitor/internal/notifier"
 	"oracle-diff-monitor/internal/scheduler"
 	"oracle-diff-monitor/internal/store"
 	"oracle-diff-monitor/internal/web"
@@ -12,7 +13,8 @@ import (
 )
 
 var (
-	port int
+	port          int
+	notifyBaseURL string
 )
 
 var serveCmd = &cobra.Command{
@@ -25,6 +27,9 @@ var serveCmd = &cobra.Command{
 			return fmt.Errorf("open store: %w", err)
 		}
 		defer s.Close()
+
+		notifier.DetailBaseURL = notifyBaseURL
+		log.Printf("通知链接基础地址: %s", notifyBaseURL)
 
 		sch := scheduler.New(s, func(pairID int64) {
 			compare.RunComparison(s, pairID)
@@ -44,4 +49,5 @@ var serveCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(serveCmd)
 	serveCmd.Flags().IntVarP(&port, "port", "p", 8080, "服务监听端口")
+	serveCmd.Flags().StringVarP(&notifyBaseURL, "notify-base-url", "u", "http://localhost:8080", "通知中差异详情的访问地址")
 }

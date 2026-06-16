@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+	"strings"
 	"time"
 	"oracle-diff-monitor/internal/models"
 )
@@ -22,6 +24,8 @@ func NewWebhookNotifier(configJSON string) (*WebhookNotifier, error) {
 }
 
 func (w *WebhookNotifier) Send(subject, body string) error {
+	log.Printf("Webhook: POST %s (subject=%q)", w.config.URL, subject)
+
 	payload := map[string]string{
 		"subject": subject,
 		"message": body,
@@ -48,8 +52,14 @@ func (w *WebhookNotifier) Send(subject, body string) error {
 	}
 	defer resp.Body.Close()
 
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(resp.Body)
+	respBody := strings.TrimSpace(buf.String())
+
+	log.Printf("Webhook: %s responded with status %d, body=%s", w.config.URL, resp.StatusCode, respBody)
+
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("webhook returned %d", resp.StatusCode)
+		return fmt.Errorf("webhook returned %d: %s", resp.StatusCode, respBody)
 	}
 	return nil
 }

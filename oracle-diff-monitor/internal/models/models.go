@@ -76,6 +76,12 @@ type WebhookConfig struct {
 	Headers map[string]string `json:"headers"`
 }
 
+type DingTalkConfig struct {
+	URL     string            `json:"url"`
+	Secret  string            `json:"secret"`
+	Headers map[string]string `json:"headers"`
+}
+
 type CompareNotification struct {
 	ID             int64 `json:"id"`
 	PairID         int64 `json:"pair_id"`

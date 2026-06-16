@@ -8,9 +8,10 @@
         </div>
         <div>
             <label class="block text-sm font-medium text-gray-700">类型</label>
-            <select name="type" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" onchange="document.getElementById('email-cfg').className=this.value==='email'?'':'hidden';document.getElementById('wh-cfg').className=this.value==='webhook'?'':'hidden'">
+            <select name="type" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" onchange="var v=this.value;document.getElementById('email-cfg').className=v==='email'?'':'hidden';document.getElementById('wh-cfg').className=(v==='webhook'||v==='dingtalk')?'':'hidden';document.getElementById('dd-secret').className=v==='dingtalk'?'':'hidden'">
                 <option value="email" {{if eq .notification.Type "email"}}selected{{end}}>邮件</option>
                 <option value="webhook" {{if eq .notification.Type "webhook"}}selected{{end}}>Webhook</option>
+                <option value="dingtalk" {{if eq .notification.Type "dingtalk"}}selected{{end}}>钉钉</option>
             </select>
         </div>
         <div id="email-cfg" {{if ne .notification.Type "email"}}class="hidden"{{end}}>
@@ -47,9 +48,13 @@
                 <label class="ml-2 text-sm text-gray-700">TLS</label>
             </div>
         </div>
-        <div id="wh-cfg" {{if ne .notification.Type "webhook"}}class="hidden"{{end}}>
+        <div id="wh-cfg" {{if and (ne .notification.Type "webhook") (ne .notification.Type "dingtalk")}}class="hidden"{{end}}>
             <label class="block text-sm font-medium text-gray-700">Webhook URL</label>
-            <input type="url" name="webhook_url" value="{{if .webhookCfg}}{{.webhookCfg.URL}}{{end}}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" placeholder="https://hooks.example.com/alert">
+            <input type="url" name="webhook_url" value="{{if .webhookCfg}}{{.webhookCfg.URL}}{{end}}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" placeholder="https://oapi.dingtalk.com/robot/send?access_token=xxx">
+            <div id="dd-secret" {{if ne .notification.Type "dingtalk"}}class="hidden"{{end}}>
+                <label class="block text-sm font-medium text-gray-700 mt-4">加签密钥</label>
+                <input type="password" name="dingtalk_secret" value="{{.dingtalkSecret}}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" placeholder="钉钉机器人安全设置的加签密钥">
+            </div>
             <label class="block text-sm font-medium text-gray-700 mt-4">自定义Headers (每行 Key: Value)</label>
             <textarea name="webhook_headers" rows="3" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm" placeholder="Authorization: Bearer token123&#10;X-Custom: value">{{if .webhookCfg}}{{range $k, $v := .webhookCfg.Headers}}{{$k}}: {{$v}}&#10;{{end}}{{end}}</textarea>
         </div>

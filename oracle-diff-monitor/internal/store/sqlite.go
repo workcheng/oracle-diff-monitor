@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"oracle-diff-monitor/internal/models"
 	"time"
 
@@ -572,17 +573,21 @@ func (s *Store) DeleteNotification(id int64) error {
 // ---- CompareNotifications ----
 
 func (s *Store) SetCompareNotifications(pairID int64, links []models.CompareNotification) error {
-	s.db.Exec(`DELETE FROM compare_notifications WHERE pair_id = ?`, pairID)
+	if _, err := s.db.Exec(`DELETE FROM compare_notifications WHERE pair_id = ?`, pairID); err != nil {
+		log.Printf("SetCompareNotifications: delete error: %v", err)
+		return err
+	}
 	for _, l := range links {
 		l.PairID = pairID
-		_, err := s.db.Exec(
+		if _, err := s.db.Exec(
 			`INSERT INTO compare_notifications (pair_id, notification_id, on_diff, on_error, on_success) VALUES (?, ?, ?, ?, ?)`,
 			pairID, l.NotificationID, boolToInt(l.OnDiff), boolToInt(l.OnError), boolToInt(l.OnSuccess),
-		)
-		if err != nil {
+		); err != nil {
+			log.Printf("SetCompareNotifications: insert error: %v", err)
 			return err
 		}
 	}
+	log.Printf("SetCompareNotifications: pair %d saved %d links", pairID, len(links))
 	return nil
 }
 

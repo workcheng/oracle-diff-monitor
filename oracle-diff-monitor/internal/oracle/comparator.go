@@ -481,6 +481,10 @@ func compareIndexesFromMaps(table string, sourceIdxs, targetIdxs []models.IndexI
 		targetMap[idx.IndexName] = idx
 	}
 
+	// Phase 1: name-based matching
+	var extraByName []models.IndexInfo   // in source, not in target (by name)
+	var missingByName []models.IndexInfo // in target, not in source (by name)
+
 	allIdxs := make(map[string]bool)
 	for _, idx := range sourceIdxs {
 		allIdxs[idx.IndexName] = true
@@ -494,26 +498,15 @@ func compareIndexesFromMaps(table string, sourceIdxs, targetIdxs []models.IndexI
 		tIdx, inTarget := targetMap[idxName]
 
 		if !inSource {
-			diffs = append(diffs, models.DiffDetail{
-				TableName:   table,
-				DiffType:    "missing_index",
-				ColumnName:  idxName,
-				SourceValue: "不存在",
-				TargetValue: formatIndexInfo(tIdx),
-			})
+			missingByName = append(missingByName, tIdx)
 			continue
 		}
 		if !inTarget {
-			diffs = append(diffs, models.DiffDetail{
-				TableName:   table,
-				DiffType:    "extra_index",
-				ColumnName:  idxName,
-				SourceValue: formatIndexInfo(sIdx),
-				TargetValue: "不存在",
-			})
+			extraByName = append(extraByName, sIdx)
 			continue
 		}
 
+		// Name matched — compare content
 		if sIdx.IndexType != tIdx.IndexType || sIdx.Uniqueness != tIdx.Uniqueness {
 			diffs = append(diffs, models.DiffDetail{
 				TableName:   table,
@@ -532,6 +525,43 @@ func compareIndexesFromMaps(table string, sourceIdxs, targetIdxs []models.IndexI
 			})
 		}
 	}
+
+	// Phase 2: content-based matching for remaining unmatched indexes
+	usedTarget := make(map[int]bool)
+	for _, sIdx := range extraByName {
+		matched := false
+		for ti, tIdx := range missingByName {
+			if usedTarget[ti] {
+				continue
+			}
+			if indexContentKey(sIdx) == indexContentKey(tIdx) {
+				usedTarget[ti] = true
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			diffs = append(diffs, models.DiffDetail{
+				TableName:   table,
+				DiffType:    "extra_index",
+				ColumnName:  sIdx.IndexName,
+				SourceValue: formatIndexInfo(sIdx),
+				TargetValue: "不存在",
+			})
+		}
+	}
+	for ti, tIdx := range missingByName {
+		if !usedTarget[ti] {
+			diffs = append(diffs, models.DiffDetail{
+				TableName:   table,
+				DiffType:    "missing_index",
+				ColumnName:  tIdx.IndexName,
+				SourceValue: "不存在",
+				TargetValue: formatIndexInfo(tIdx),
+			})
+		}
+	}
+
 	return diffs
 }
 
@@ -738,75 +768,11 @@ func fetchIndexesParallel(source, target *Client, schema, table string) ([]model
 }
 
 func (c *Comparator) compareIndexes(schema, table string) ([]models.DiffDetail, error) {
-	var diffs []models.DiffDetail
-
 	sourceIdxs, targetIdxs, err := fetchIndexesParallel(c.source, c.target, schema, table)
 	if err != nil {
 		return nil, err
 	}
-
-	sourceMap := make(map[string]models.IndexInfo)
-	for _, idx := range sourceIdxs {
-		sourceMap[idx.IndexName] = idx
-	}
-	targetMap := make(map[string]models.IndexInfo)
-	for _, idx := range targetIdxs {
-		targetMap[idx.IndexName] = idx
-	}
-
-	allIdxs := make(map[string]bool)
-	for _, idx := range sourceIdxs {
-		allIdxs[idx.IndexName] = true
-	}
-	for _, idx := range targetIdxs {
-		allIdxs[idx.IndexName] = true
-	}
-
-	for idxName := range allIdxs {
-		sIdx, inSource := sourceMap[idxName]
-		tIdx, inTarget := targetMap[idxName]
-
-		if !inSource {
-			diffs = append(diffs, models.DiffDetail{
-				TableName:   table,
-				DiffType:    "missing_index",
-				ColumnName:  idxName,
-				SourceValue: "不存在",
-				TargetValue: formatIndexInfo(tIdx),
-			})
-			continue
-		}
-		if !inTarget {
-			diffs = append(diffs, models.DiffDetail{
-				TableName:   table,
-				DiffType:    "extra_index",
-				ColumnName:  idxName,
-				SourceValue: formatIndexInfo(sIdx),
-				TargetValue: "不存在",
-			})
-			continue
-		}
-
-		if sIdx.IndexType != tIdx.IndexType || sIdx.Uniqueness != tIdx.Uniqueness {
-			diffs = append(diffs, models.DiffDetail{
-				TableName:   table,
-				DiffType:    "index_type_mismatch",
-				ColumnName:  idxName,
-				SourceValue: formatIndexInfo(sIdx),
-				TargetValue: formatIndexInfo(tIdx),
-			})
-		} else if strings.Join(sIdx.Columns, ",") != strings.Join(tIdx.Columns, ",") {
-			diffs = append(diffs, models.DiffDetail{
-				TableName:   table,
-				DiffType:    "index_column_mismatch",
-				ColumnName:  idxName,
-				SourceValue: strings.Join(sIdx.Columns, ","),
-				TargetValue: strings.Join(tIdx.Columns, ","),
-			})
-		}
-	}
-
-	return diffs, nil
+	return compareIndexesFromMaps(table, sourceIdxs, targetIdxs), nil
 }
 
 func fetchConstraintsParallel(source, target *Client, schema, table string) ([]models.ConstraintInfo, []models.ConstraintInfo, error) {
@@ -873,6 +839,10 @@ func comparePK(table string, source, target []models.ConstraintInfo) []models.Di
 		targetMap[c.ConstraintName] = c
 	}
 
+	// Phase 1: name-based matching
+	var extraByName []models.ConstraintInfo
+	var missingByName []models.ConstraintInfo
+
 	all := make(map[string]bool)
 	for _, c := range source {
 		all[c.ConstraintName] = true
@@ -886,23 +856,11 @@ func comparePK(table string, source, target []models.ConstraintInfo) []models.Di
 		t, inTarget := targetMap[name]
 
 		if !inSource {
-			diffs = append(diffs, models.DiffDetail{
-				TableName:   table,
-				DiffType:    "missing_pk",
-				ColumnName:  name,
-				SourceValue: "不存在",
-				TargetValue: strings.Join(t.Columns, ","),
-			})
+			missingByName = append(missingByName, t)
 			continue
 		}
 		if !inTarget {
-			diffs = append(diffs, models.DiffDetail{
-				TableName:   table,
-				DiffType:    "extra_pk",
-				ColumnName:  name,
-				SourceValue: strings.Join(s.Columns, ","),
-				TargetValue: "不存在",
-			})
+			extraByName = append(extraByName, s)
 			continue
 		}
 		if strings.Join(s.Columns, ",") != strings.Join(t.Columns, ",") {
@@ -915,6 +873,43 @@ func comparePK(table string, source, target []models.ConstraintInfo) []models.Di
 			})
 		}
 	}
+
+	// Phase 2: content-based matching (same PK columns → same PK regardless of name)
+	usedTarget := make(map[int]bool)
+	for _, s := range extraByName {
+		matched := false
+		for ti, t := range missingByName {
+			if usedTarget[ti] {
+				continue
+			}
+			if pkContentKey(s) == pkContentKey(t) {
+				usedTarget[ti] = true
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			diffs = append(diffs, models.DiffDetail{
+				TableName:   table,
+				DiffType:    "extra_pk",
+				ColumnName:  s.ConstraintName,
+				SourceValue: strings.Join(s.Columns, ","),
+				TargetValue: "不存在",
+			})
+		}
+	}
+	for ti, t := range missingByName {
+		if !usedTarget[ti] {
+			diffs = append(diffs, models.DiffDetail{
+				TableName:   table,
+				DiffType:    "missing_pk",
+				ColumnName:  t.ConstraintName,
+				SourceValue: "不存在",
+				TargetValue: strings.Join(t.Columns, ","),
+			})
+		}
+	}
+
 	return diffs
 }
 
@@ -995,6 +990,10 @@ func compareOtherCons(table string, source, target []models.ConstraintInfo) []mo
 		targetMap[c.ConstraintName] = c
 	}
 
+	// Phase 1: name-based matching
+	var extraByName []models.ConstraintInfo
+	var missingByName []models.ConstraintInfo
+
 	all := make(map[string]bool)
 	for _, c := range source {
 		all[c.ConstraintName] = true
@@ -1008,23 +1007,11 @@ func compareOtherCons(table string, source, target []models.ConstraintInfo) []mo
 		t, inTarget := targetMap[name]
 
 		if !inSource {
-			diffs = append(diffs, models.DiffDetail{
-				TableName:   table,
-				DiffType:    "missing_constraint",
-				ColumnName:  name,
-				SourceValue: "不存在",
-				TargetValue: formatOtherCons(t),
-			})
+			missingByName = append(missingByName, t)
 			continue
 		}
 		if !inTarget {
-			diffs = append(diffs, models.DiffDetail{
-				TableName:   table,
-				DiffType:    "extra_constraint",
-				ColumnName:  name,
-				SourceValue: formatOtherCons(s),
-				TargetValue: "不存在",
-			})
+			extraByName = append(extraByName, s)
 			continue
 		}
 		if s.SearchCondition != t.SearchCondition {
@@ -1037,6 +1024,43 @@ func compareOtherCons(table string, source, target []models.ConstraintInfo) []mo
 			})
 		}
 	}
+
+	// Phase 2: content-based matching (same condition/columns → same constraint)
+	usedTarget := make(map[int]bool)
+	for _, s := range extraByName {
+		matched := false
+		for ti, t := range missingByName {
+			if usedTarget[ti] {
+				continue
+			}
+			if otherConsContentKey(s) == otherConsContentKey(t) {
+				usedTarget[ti] = true
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			diffs = append(diffs, models.DiffDetail{
+				TableName:   table,
+				DiffType:    "extra_constraint",
+				ColumnName:  s.ConstraintName,
+				SourceValue: formatOtherCons(s),
+				TargetValue: "不存在",
+			})
+		}
+	}
+	for ti, t := range missingByName {
+		if !usedTarget[ti] {
+			diffs = append(diffs, models.DiffDetail{
+				TableName:   table,
+				DiffType:    "missing_constraint",
+				ColumnName:  t.ConstraintName,
+				SourceValue: "不存在",
+				TargetValue: formatOtherCons(t),
+			})
+		}
+	}
+
 	return diffs
 }
 
@@ -1049,6 +1073,26 @@ func normaliseType(t string) string {
 		return "INTERVAL"
 	}
 	return t
+}
+
+// indexContentKey returns a content fingerprint for an index, used for
+// name-independent matching (handles auto-generated index names like SYS_Cnnnnn).
+func indexContentKey(idx models.IndexInfo) string {
+	return fmt.Sprintf("%s|%s|%s", idx.IndexType, idx.Uniqueness, strings.Join(idx.Columns, ","))
+}
+
+// pkContentKey returns a content fingerprint for a PRIMARY KEY constraint.
+func pkContentKey(con models.ConstraintInfo) string {
+	return strings.Join(con.Columns, ",")
+}
+
+// otherConsContentKey returns a content fingerprint for a CHECK or UNIQUE constraint.
+func otherConsContentKey(con models.ConstraintInfo) string {
+	if con.ConstraintType == "C" {
+		return con.SearchCondition
+	}
+	// UNIQUE
+	return strings.Join(con.Columns, ",")
 }
 
 func toSet(items []string) map[string]bool {

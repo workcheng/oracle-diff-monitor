@@ -38,6 +38,7 @@ func RunComparison(s *store.Store, pairID int64) (*models.CompareRun, []models.D
 		run.ErrorMsg = fmt.Sprintf("连接源库失败: %v", err)
 		run.ProgressMsg = "源库连接失败"
 		s.UpdateCompareRun(run)
+		NotifyCompareResult(s, pair.ID, run, nil)
 		return run, nil, fmt.Errorf("%s", run.ErrorMsg)
 	}
 	defer sourceClient.Close()
@@ -50,6 +51,7 @@ func RunComparison(s *store.Store, pairID int64) (*models.CompareRun, []models.D
 		run.ErrorMsg = fmt.Sprintf("连接目标库失败: %v", err)
 		run.ProgressMsg = "目标库连接失败"
 		s.UpdateCompareRun(run)
+		NotifyCompareResult(s, pair.ID, run, nil)
 		return run, nil, fmt.Errorf("%s", run.ErrorMsg)
 	}
 	defer targetClient.Close()
@@ -72,6 +74,7 @@ func RunComparison(s *store.Store, pairID int64) (*models.CompareRun, []models.D
 		run.ErrorMsg = fmt.Sprintf("比对失败: %v", err)
 		run.ProgressMsg = "比对失败"
 		s.UpdateCompareRun(run)
+		NotifyCompareResult(s, pair.ID, run, nil)
 		return run, nil, fmt.Errorf("%s", run.ErrorMsg)
 	}
 
@@ -98,24 +101,35 @@ func RunComparison(s *store.Store, pairID int64) (*models.CompareRun, []models.D
 }
 
 func NotifyCompareResult(s *store.Store, pairID int64, run *models.CompareRun, diffs []models.DiffDetail) {
+	log.Printf("NotifyCompareResult: called for pairID=%d, diffs=%d, status=%s", pairID, len(diffs), run.Status)
+
 	pair, err := s.GetComparePair(pairID)
 	if err != nil {
+		log.Printf("NotifyCompareResult: GetComparePair failed: %v", err)
 		return
 	}
 
 	links, err := s.GetCompareNotifications(pairID)
-	if err != nil || len(links) == 0 {
+	if err != nil {
+		log.Printf("NotifyCompareResult: GetCompareNotifications error: %v", err)
+		return
+	}
+	log.Printf("NotifyCompareResult: found %d notification links for pair %d", len(links), pairID)
+	if len(links) == 0 {
 		return
 	}
 
 	var notifIDs []int64
 	hasDiff := len(diffs) > 0
 	hasError := run.Status == "failed"
+	log.Printf("NotifyCompareResult: hasDiff=%v hasError=%v", hasDiff, hasError)
 
 	notifications, err := s.ListNotifications()
 	if err != nil {
+		log.Printf("NotifyCompareResult: ListNotifications error: %v", err)
 		return
 	}
+	log.Printf("NotifyCompareResult: total %d notification channels", len(notifications))
 	notifMap := make(map[int64]*models.Notification)
 	for _, n := range notifications {
 		notifMap[n.ID] = n
@@ -132,6 +146,7 @@ func NotifyCompareResult(s *store.Store, pairID int64, run *models.CompareRun, d
 			notifIDs = append(notifIDs, link.NotificationID)
 		}
 	}
+	log.Printf("NotifyCompareResult: %d notifIDs matched conditions", len(notifIDs))
 
 	if len(notifIDs) == 0 {
 		return
@@ -143,24 +158,24 @@ func NotifyCompareResult(s *store.Store, pairID int64, run *models.CompareRun, d
 			enabledNotifs = append(enabledNotifs, n)
 		}
 	}
+	log.Printf("NotifyCompareResult: %d enabled notifications to send", len(enabledNotifs))
 	if len(enabledNotifs) == 0 {
 		return
 	}
 
-	dispatcher, err := notifier.NewDispatcher(enabledNotifs)
-	if err != nil {
-		log.Printf("create dispatcher failed: %v", err)
-		return
-	}
+	dispatcher := notifier.NewDispatcher(enabledNotifs)
+	log.Printf("NotifyCompareResult: dispatcher created")
 
 	var diffPtrs []*models.DiffDetail
 	for i := range diffs {
 		diffPtrs = append(diffPtrs, &diffs[i])
 	}
 
+	log.Printf("NotifyCompareResult: sending notification for pair '%s'...", pair.Name)
 	if hasError {
 		dispatcher.SendErrorReport(pair.Name, run.ErrorMsg, notifIDs)
 	} else {
 		dispatcher.SendDiffReport(run, diffPtrs, pair.Name, notifIDs)
 	}
+	log.Printf("NotifyCompareResult: done")
 }

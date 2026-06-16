@@ -520,6 +520,13 @@ func (s *Server) createNotification(c *gin.Context) {
 			Headers: parseHeaders(c.PostForm("webhook_headers")),
 		}
 		cfgJSON, _ = json.Marshal(cfg)
+	} else if n.Type == "dingtalk" {
+		cfg := models.DingTalkConfig{
+			URL:     c.PostForm("webhook_url"),
+			Secret:  c.PostForm("dingtalk_secret"),
+			Headers: parseHeaders(c.PostForm("webhook_headers")),
+		}
+		cfgJSON, _ = json.Marshal(cfg)
 	}
 	n.ConfigJSON = string(cfgJSON)
 
@@ -560,6 +567,12 @@ func (s *Server) editNotificationForm(c *gin.Context) {
 		if json.Unmarshal([]byte(n.ConfigJSON), &cfg) == nil {
 			data["webhookCfg"] = cfg
 		}
+	} else if n.Type == "dingtalk" {
+		var cfg models.DingTalkConfig
+		if json.Unmarshal([]byte(n.ConfigJSON), &cfg) == nil {
+			data["webhookCfg"] = cfg
+			data["dingtalkSecret"] = cfg.Secret
+		}
 	}
 
 	c.HTML(http.StatusOK, "notification_form.html", data)
@@ -594,6 +607,13 @@ func (s *Server) updateNotification(c *gin.Context) {
 	} else if n.Type == "webhook" {
 		cfg := models.WebhookConfig{
 			URL:     c.PostForm("webhook_url"),
+			Headers: parseHeaders(c.PostForm("webhook_headers")),
+		}
+		cfgJSON, _ = json.Marshal(cfg)
+	} else if n.Type == "dingtalk" {
+		cfg := models.DingTalkConfig{
+			URL:     c.PostForm("webhook_url"),
+			Secret:  c.PostForm("dingtalk_secret"),
 			Headers: parseHeaders(c.PostForm("webhook_headers")),
 		}
 		cfgJSON, _ = json.Marshal(cfg)
@@ -663,14 +683,18 @@ func (s *Server) updateSchedule(c *gin.Context) {
 
 func (s *Server) updatePairNotifications(c *gin.Context) {
 	pairID, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	log.Printf("updatePairNotifications: pairID=%d", pairID)
 
 	notifications, _ := s.store.ListNotifications()
+	log.Printf("updatePairNotifications: found %d notification channels", len(notifications))
 	var links []models.CompareNotification
 
 	for _, n := range notifications {
 		onDiff := c.PostForm(fmt.Sprintf("notif_%d_diff", n.ID)) == "on"
 		onError := c.PostForm(fmt.Sprintf("notif_%d_error", n.ID)) == "on"
 		onSuccess := c.PostForm(fmt.Sprintf("notif_%d_success", n.ID)) == "on"
+		log.Printf("updatePairNotifications: notif %d (name=%s) diff=%v error=%v success=%v",
+			n.ID, n.Name, onDiff, onError, onSuccess)
 
 		if onDiff || onError || onSuccess {
 			links = append(links, models.CompareNotification{
@@ -683,7 +707,12 @@ func (s *Server) updatePairNotifications(c *gin.Context) {
 		}
 	}
 
-	s.store.SetCompareNotifications(pairID, links)
+	log.Printf("updatePairNotifications: saving %d links for pair %d", len(links), pairID)
+	if err := s.store.SetCompareNotifications(pairID, links); err != nil {
+		log.Printf("updatePairNotifications: SetCompareNotifications error: %v", err)
+	} else {
+		log.Printf("updatePairNotifications: saved successfully")
+	}
 	c.Redirect(http.StatusFound, "/pairs/"+strconv.FormatInt(pairID, 10)+"/edit")
 }
 
