@@ -32,6 +32,28 @@
                 <input type="text" name="table_filter" value="{{if .pair}}{{.pair.TableFilter}}{{end}}" placeholder="EMP%" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
             </div>
         </div>
+
+        {{if .pair}}
+        <div class="border-t border-gray-200 pt-4">
+            <h3 class="text-sm font-medium text-gray-900 mb-2">选择比对表（不勾选则比对全部）</h3>
+            <div class="space-y-2">
+                <div class="flex space-x-2">
+                    <input type="text" id="table-search" placeholder="搜索表名..." class="flex-1 border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm">
+                    <button type="button" id="load-tables-btn" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700" onclick="loadTables()">加载表清单</button>
+                </div>
+                <input type="hidden" name="selected_tables" id="selected-tables" value="{{if .pair}}{{.pair.SelectedTables}}{{end}}">
+                <div id="table-list" class="border border-gray-200 rounded-lg max-h-60 overflow-y-auto hidden">
+                    <div class="p-2 bg-gray-50 border-b border-gray-200 flex items-center">
+                        <input type="checkbox" id="select-all" onchange="toggleAll()" class="h-4 w-4 text-blue-600 border-gray-300 rounded">
+                        <label for="select-all" class="ml-2 text-xs text-gray-600">全选/取消</label>
+                        <span id="selected-count" class="ml-auto text-xs text-gray-500">已选 0 张</span>
+                    </div>
+                    <div id="table-items" class="divide-y divide-gray-100"></div>
+                </div>
+            </div>
+        </div>
+        {{end}}
+
         <div class="flex items-center">
             <input type="checkbox" name="enabled" {{if not .pair}}checked{{else}}{{if .pair.Enabled}}checked{{end}}{{end}} class="h-4 w-4 text-blue-600 border-gray-300 rounded">
             <label class="ml-2 text-sm text-gray-700">启用</label>
@@ -45,24 +67,49 @@
 
 {{if .pair}}
 <div class="bg-white rounded-lg shadow p-6 max-w-2xl mt-6">
-    <h2 class="text-lg font-medium text-gray-900 mb-4">选择比对表</h2>
-    <p class="text-sm text-gray-500 mb-4">勾选需要比对的表（不勾选则比对全部）</p>
-    <div class="space-y-3">
-        <div class="flex space-x-2">
-            <input type="text" id="table-search" placeholder="搜索表名..." class="flex-1 border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm">
-            <button type="button" id="load-tables-btn" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700" onclick="loadTables()">加载表清单</button>
+    <h2 class="text-lg font-medium text-gray-900 mb-4">通知配置</h2>
+    <p class="text-sm text-gray-500 mb-4">配置比对完成后发送通知的渠道和触发条件</p>
+    <form action="/pairs/{{.pair.ID}}/notifications" method="POST" class="space-y-4">
+        {{if .notifications}}
+        <div class="border border-gray-200 rounded-lg overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">通知渠道</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">有差异时</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">出错时</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">成功时</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {{range .notifications}}
+                    {{$link := index $.notifMap .ID}}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 text-sm">
+                            <span class="font-medium text-gray-900">{{.Name}}</span>
+                            <span class="ml-2 px-2 py-0.5 text-xs rounded-full {{if eq .Type "email"}}bg-blue-100 text-blue-700{{else}}bg-purple-100 text-purple-700{{end}}">{{if eq .Type "email"}}邮件{{else}}Webhook{{end}}</span>
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <input type="checkbox" name="notif_{{.ID}}_diff" {{if and $link $link.OnDiff}}checked{{end}} class="h-4 w-4 text-blue-600 border-gray-300 rounded">
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <input type="checkbox" name="notif_{{.ID}}_error" {{if and $link $link.OnError}}checked{{end}} class="h-4 w-4 text-blue-600 border-gray-300 rounded">
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <input type="checkbox" name="notif_{{.ID}}_success" {{if and $link $link.OnSuccess}}checked{{end}} class="h-4 w-4 text-blue-600 border-gray-300 rounded">
+                        </td>
+                    </tr>
+{{end}}
+                </tbody>
+            </table>
         </div>
-        <input type="hidden" name="selected_tables" id="selected-tables" value="{{if .pair}}{{.pair.SelectedTables}}{{end}}">
-        <div id="table-list" class="border border-gray-200 rounded-lg max-h-60 overflow-y-auto hidden">
-            <div class="p-2 bg-gray-50 border-b border-gray-200 flex items-center">
-                <input type="checkbox" id="select-all" onchange="toggleAll()" class="h-4 w-4 text-blue-600 border-gray-300 rounded">
-                <label for="select-all" class="ml-2 text-xs text-gray-600">全选/取消</label>
-                <span id="selected-count" class="ml-auto text-xs text-gray-500">已选 0 张</span>
-            </div>
-            <div id="table-items" class="divide-y divide-gray-100">
-            </div>
+        {{else}}
+        <p class="text-sm text-gray-500">暂无通知渠道，请先在<a href="/settings" class="text-blue-600 hover:underline">设置页面</a>添加</p>
+        {{end}}
+        <div class="flex space-x-3 pt-4">
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700">保存通知配置</button>
         </div>
-    </div>
+    </form>
 </div>
 
 <script>
@@ -86,7 +133,6 @@ function loadTables() {
                 return;
             }
             allTables = data.tables || [];
-            // Merge pre-selected from save state
             var saved = document.getElementById('selected-tables').value;
             if (saved) {
                 saved.split(',').forEach(function(t) {
@@ -139,57 +185,10 @@ function toggleAll() {
 
 document.getElementById('table-search').addEventListener('input', renderTables);
 
-// Auto-load tables on page load if editing
 if (document.querySelector('#table-list')) {
     loadTables();
 }
 </script>
-
-<div class="bg-white rounded-lg shadow p-6 max-w-2xl mt-6">
-    <h2 class="text-lg font-medium text-gray-900 mb-4">通知配置</h2>
-    <p class="text-sm text-gray-500 mb-4">配置比对完成后发送通知的渠道和触发条件</p>
-    <form action="/pairs/{{.pair.ID}}/notifications" method="POST" class="space-y-4">
-        {{if .notifications}}
-        <div class="border border-gray-200 rounded-lg overflow-hidden">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">通知渠道</th>
-                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">有差异时</th>
-                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">出错时</th>
-                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">成功时</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200">
-                    {{range .notifications}}
-                    {{$link := index $.notifMap .ID}}
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-3 text-sm">
-                            <span class="font-medium text-gray-900">{{.Name}}</span>
-                            <span class="ml-2 px-2 py-0.5 text-xs rounded-full {{if eq .Type "email"}}bg-blue-100 text-blue-700{{else}}bg-purple-100 text-purple-700{{end}}">{{if eq .Type "email"}}邮件{{else}}Webhook{{end}}</span>
-                        </td>
-                        <td class="px-4 py-3 text-center">
-                            <input type="checkbox" name="notif_{{.ID}}_diff" {{if and $link $link.OnDiff}}checked{{end}} class="h-4 w-4 text-blue-600 border-gray-300 rounded">
-                        </td>
-                        <td class="px-4 py-3 text-center">
-                            <input type="checkbox" name="notif_{{.ID}}_error" {{if and $link $link.OnError}}checked{{end}} class="h-4 w-4 text-blue-600 border-gray-300 rounded">
-                        </td>
-                        <td class="px-4 py-3 text-center">
-                            <input type="checkbox" name="notif_{{.ID}}_success" {{if and $link $link.OnSuccess}}checked{{end}} class="h-4 w-4 text-blue-600 border-gray-300 rounded">
-                        </td>
-                    </tr>
-{{end}}
-                </tbody>
-            </table>
-        </div>
-        {{else}}
-        <p class="text-sm text-gray-500">暂无通知渠道，请先在<a href="/settings" class="text-blue-600 hover:underline">设置页面</a>添加</p>
-        {{end}}
-        <div class="flex space-x-3 pt-4">
-            <button type="submit" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700">保存通知配置</button>
-        </div>
-    </form>
-</div>
 {{end}}
 {{end}}
 {{template "layout.html" .}}
